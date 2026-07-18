@@ -1,0 +1,29 @@
+# 数据文件（体积大，不入仓库）
+data/
+
+# 运行输出（每次跑会重新生成）
+output/
+
+# Spark 临时目录异常名（Windows bug 产物）
+Users*AppData*Local*Temp*spark_tmp
+
+# Python 缓存
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# 虚拟环境
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 系统文件
+.DS_Store
+Thumbs.db
