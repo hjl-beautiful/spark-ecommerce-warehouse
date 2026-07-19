@@ -255,6 +255,57 @@ ODS/DWD/DWS 中间层全部用 Parquet 列式存储，相比 CSV：
 ### 4. 全流程自动化
 `run_all.py` 一键跑完四层 ETL，每层输出落盘到 `output/` 对应目录，可单独重跑任一层。
 
+### 5. 生产级 Airflow 调度扩展
+
+本项目支持接入 Apache Airflow 实现生产级调度，典型 DAG 设计如下：
+
+```
+spark_warehouse_dag
+├── ods_load_task        (每日 02:00)  # ODS 层：CSV → Parquet
+├── dwd_clean_task       (依赖 ods)    # DWD 层：清洗 + 退货分离
+├── dws_aggregate_task   (依赖 dwd)    # DWS 层：维度汇总
+└── ads_metrics_task     (依赖 dws)    # ADS 层：业务指标 + RFM
+```
+
+**调度配置要点**：
+- 调度周期：`schedule_interval='0 2 * * *'`（每日凌晨 2 点）
+- 重试策略：`retries=3, retry_delay=timedelta(minutes=10)`
+- 任务依赖：`ods >> dwd >> dws >> ads`（严格串行，保证数据血缘）
+- 失败告警：集成钉钉/企业微信 webhook，任务失败自动通知
+- 数据质量校验：每层完成后校验行数阈值，异常则阻断下游
+
+**DAG 示例代码骨架**（见 `src/airflow_dag.py`）：
+
+```python
+from airflow import DAG
+from airflow.operators.python import PythonOperator
+from datetime import datetime, timedelta
+
+default_args = {
+    'owner': 'data_warehouse',
+    'depends_on_past': False,
+    'retries': 3,
+    'retry_delay': timedelta(minutes=10),
+}
+
+dag = DAG(
+    'spark_warehouse_etl',
+    default_args=default_args,
+    schedule_interval='0 2 * * *',
+    start_date=datetime(2026, 1, 1),
+    catchup=False,
+)
+
+ods_task = PythonOperator(task_id='ods_load', python_callable=run_ods, dag=dag)
+dwd_task = PythonOperator(task_id='dwd_clean', python_callable=run_dwd, dag=dag)
+dws_task = PythonOperator(task_id='dws_aggregate', python_callable=run_dws, dag=dag)
+ads_task = PythonOperator(task_id='ads_metrics', python_callable=run_ads, dag=dag)
+
+ods_task >> dwd_task >> dws_task >> ads_task
+```
+
+> 本地开发环境用 `run_all.py` 一键运行；生产环境用 Airflow 调度，支持失败重试、依赖管理、告警通知、数据质量校验。
+
 ---
 
 ## 九、简历描述参考
