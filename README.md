@@ -109,7 +109,7 @@
 | Parquet | - | 列式存储（ODS/DWD/DWS 中间层） |
 | Spark MLlib | 3.5.1 | KMeans 聚类（ADS 层 RFM 分群） |
 | pandas | - | toPandas 结果收集 + CSV 输出 |
-| Python | 3.13 | 脚本语言 |
+| Python | 3.11 | 脚本语言 |
 | Java | 17 | PySpark 依赖的 JVM |
 
 ---
