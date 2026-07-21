@@ -1,8 +1,8 @@
 # Spark 电商数仓 ETL 平台
 
-> 基于 PySpark 构建的离线电商交易数仓，按 **ODS → DWD → DWS → ADS** 四层分层架构处理 39 万条 UCI Online Retail 英国电商交易数据，完成数据清洗、维度建模、离线 ETL 与用户分群分析，输出月度 GMV、TOP 热销商品、复购率、RFM 用户分群等核心业务指标。
+> 基于 PySpark 构建的离线电商交易数仓，按 **ODS → DWD → DWS → ADS** 四层分层架构处理 39.8 万条清洗后的 UCI Online Retail 英国电商交易数据，完成数据清洗、维度建模、离线 ETL 与用户分群分析，输出月度 GMV、TOP 热销商品、复购率、RFM 用户分群等核心业务指标。
 
-![PySpark](https://img.shields.io/badge/PySpark-3.5.1-orange) ![Python](https://img.shields.io/badge/Python-3.13-blue) ![Java](https://img.shields.io/badge/Java-17-red) ![License](https://img.shields.io/badge/License-MIT-green)
+![PySpark](https://img.shields.io/badge/PySpark-3.5.1-orange) ![Python](https://img.shields.io/badge/Python-3.11-blue) ![Java](https://img.shields.io/badge/Java-17-red) ![License](https://img.shields.io/badge/License-MIT-green)
 
 ---
 
@@ -87,7 +87,7 @@
 
 | 层 | 表 | 行数 | 说明 |
 |---|---|---|---|
-| ODS | ods_retail | 397,884 | UCI 原始 CSV 加载，14 字段 |
+| ODS | ods_retail | 397,884 | UCI 清洗后 CSV 原样加载，14 字段 |
 | DWD | dwd_retail_detail | 387,846 | 清洗去重 + 退货标记 + 日期派生，16 字段 |
 | DWS | dws_user | 4,346 | 用户级聚合（RFM 基础） |
 | DWS | dws_daily | 305 | 日级销售聚合 |
@@ -104,11 +104,11 @@
 
 | 组件 | 版本 | 说明 |
 |---|---|---|
-| PySpark | 3.5.1 | 分布式数据处理引擎（local[1] 模式） |
+| PySpark | 3.5.1 | Spark 本地处理引擎（local[1] 模式） |
 | Spark SQL | 3.5.1 | DataFrame + agg + window 分层查询 |
 | Parquet | - | 列式存储（ODS/DWD/DWS 中间层） |
-| scikit-learn | - | KMeans 聚类（ADS 层 RFM 分群） |
-| pandas | - | Parquet 读取 + CSV 输出 |
+| Spark MLlib | 3.5.1 | KMeans 聚类（ADS 层 RFM 分群） |
+| pandas | - | toPandas 结果收集 + CSV 输出 |
 | Python | 3.13 | 脚本语言 |
 | Java | 17 | PySpark 依赖的 JVM |
 
@@ -122,7 +122,7 @@ spark-ecommerce-warehouse/
 ├── ETL_RUN_REPORT.md                  # 运行结果报告
 ├── requirements.txt                   # Python 依赖
 ├── data/
-│   └── OnlineRetail_cleaned.csv       # 数据源（UCI 电商 40 万条）
+│   └── OnlineRetail_cleaned.csv       # 数据源（UCI 电商清洗后 39.8 万条）
 ├── src/
 │   ├── __init__.py
 │   ├── ods_load.py                    # ODS 层：CSV → Parquet
@@ -143,7 +143,7 @@ spark-ecommerce-warehouse/
 
 ### 1. 环境要求
 
-- Python 3.10+
+- Python 3.10 ~ 3.11（PySpark 3.5.1 官方支持范围，建议 3.11）
 - Java 8 / 11 / 17（PySpark 依赖）
 - Windows 用户额外需要 [winutils.exe](https://github.com/cdarlint/winutils) + hadoop.dll
 
@@ -165,8 +165,7 @@ pip install -r requirements.txt
 ```
 pyspark==3.5.1
 pandas
-scikit-learn
-pyarrow
+pyarrow>=14.0.0
 ```
 
 ### 3. 准备数据
@@ -255,9 +254,9 @@ ODS/DWD/DWS 中间层全部用 Parquet 列式存储，相比 CSV：
 ### 4. 全流程自动化
 `run_all.py` 一键跑完四层 ETL，每层输出落盘到 `output/` 对应目录，可单独重跑任一层。
 
-### 5. 生产级 Airflow 调度扩展
+### 5. 可扩展为 Airflow 调度
 
-本项目支持接入 Apache Airflow 实现生产级调度，典型 DAG 设计如下：
+可扩展接入 Apache Airflow 实现生产级调度，下方为典型 DAG 设计（参考骨架）：
 
 ```
 spark_warehouse_dag
@@ -274,7 +273,7 @@ spark_warehouse_dag
 - 失败告警：集成钉钉/企业微信 webhook，任务失败自动通知
 - 数据质量校验：每层完成后校验行数阈值，异常则阻断下游
 
-**DAG 示例代码骨架**（见 `src/airflow_dag.py`）：
+**DAG 示例代码骨架**：
 
 ```python
 from airflow import DAG
@@ -304,13 +303,13 @@ ads_task = PythonOperator(task_id='ads_metrics', python_callable=run_ads, dag=da
 ods_task >> dwd_task >> dws_task >> ads_task
 ```
 
-> 本地开发环境用 `run_all.py` 一键运行；生产环境用 Airflow 调度，支持失败重试、依赖管理、告警通知、数据质量校验。
+> 本地开发用 `run_all.py` 一键运行；如需上生产，可参考上方 DAG 骨架接入 Airflow，获得失败重试、依赖管理、告警通知与数据质量校验能力（Airflow 未随仓库部署，需自行搭建）。
 
 ---
 
 ## 九、简历描述参考
 
-> 基于 PySpark 构建电商交易数仓，设计 ODS→DWD→DWS→ADS 四层分层架构，处理 39 万条英国电商交易数据，完成数据去重、退货分离、异常过滤等清洗与维度建模；
+> 基于 PySpark 构建电商交易数仓，设计 ODS→DWD→DWS→ADS 四层分层架构，处理 39.8 万条清洗后的英国电商交易数据，完成数据去重、退货分离、异常过滤等清洗与维度建模；
 > 使用 Spark SQL 构建用户/商品/日级汇总宽表，通过 KMeans 完成 RFM 用户分群（高价值/潜力/一般/流失 4 群），输出月度 GMV、TOP20 热销商品、65.51% 复购率等核心业务指标。
 
 ---
@@ -319,8 +318,9 @@ ods_task >> dwd_task >> dws_task >> ads_task
 
 **UCI Online Retail Dataset**：英国在线零售商 2010-12-01 至 2011-12-09 的交易记录。
 
-- 原始行数：541,909
-- 清洗后：397,884（剔除无 CustomerID 和异常 Quantity/UnitPrice 的行）
+- UCI 原始数据集：541,909 行（含无 CustomerID、异常 Quantity/UnitPrice 等）
+- 本仓库数据源 `data/OnlineRetail_cleaned.csv`：397,884 行（已剔除无 CustomerID 与异常的预清洗子集）
+- 经本仓库 DWD 层进一步清洗（去重 + 退货分离 + 缺失处理）后：387,846 行
 - 时间跨度：13 个月
 - 覆盖国家：37 个
 - 用户数：4,346

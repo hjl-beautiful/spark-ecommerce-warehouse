@@ -1,12 +1,12 @@
 # Spark 电商数仓 ETL 项目 — 运行结果报告
 
 ## 项目概述
-基于 PySpark 构建 UCI Online Retail 电商交易数仓，按 ODS→DWD→DWS→ADS 四层分层建模，处理 397,884 条原始交易数据，覆盖 37 个国家、4,346 个用户、3,665 个商品。
+基于 PySpark 构建 UCI Online Retail 电商交易数仓，按 ODS→DWD→DWS→ADS 四层分层建模，处理 397,884 条清洗后的交易数据（UCI 预清洗子集，原始数据集 541,909 条），覆盖 37 个国家、4,346 个用户、3,665 个商品。
 
 ## 数据规模
 | 层 | 表 | 行数 | 说明 |
 |---|---|---|---|
-| ODS | ods_retail | 397,884 | UCI 原始 CSV 加载，14 字段 |
+| ODS | ods_retail | 397,884 | UCI 预清洗子集加载，14 字段 |
 | DWD | dwd_retail_detail | 387,846 | 清洗去重、退货标记、日期派生，16 字段 |
 | DWS | dws_user | 4,346 | 用户级聚合（RFM 维度） |
 | DWS | dws_daily | 305 | 日级销售聚合 |
@@ -21,13 +21,13 @@
 
 ### 1. 月度销售趋势（2010-12 ~ 2011-12）
 - 月均 GMV：约 £680K
-- 峰值月：2011-11，GMV £1,147,058，2,657 笔订单，2,390 客户
-- 12 月仅 8 天数据（截至 12-09）但日均 GMV 高达 £64,388
+- 峰值月：2011-11，GMV £1,147,059，2,657 笔订单，2,390 客户
+- 12 月仅 8 天数据（截至 12-09）但日均 GMV 高达 £64,389
 
 ### 2. TOP 5 热销商品
 | 排名 | 商品编码 | 商品名 | GMV(£) | 订单数 |
 |---|---|---|---|---|
-| 1 | 23843 | PAPER CRAFT, LITTLE BIRDIE | 168,469 | 1 |
+| 1 | 23843 | PAPER CRAFT, LITTLE BIRDIE | 168,470 | 1 |
 | 2 | 22423 | REGENCY CAKESTAND 3 TIER | 141,946 | 1,703 |
 | 3 | 85123A | WHITE HANGING HEART T-LIGHT | 100,202 | 1,978 |
 | 4 | 85099B | JUMBO BAG RED RETROSPOT | 84,962 | 1,600 |
@@ -50,8 +50,8 @@
 - PySpark 3.5.1（local[1] 模式）
 - Spark SQL（DataFrame + agg + window）
 - Parquet 列式存储
-- sklearn KMeans（ADS 层 RFM 聚类）
-- Java 17、Python 3.13.12
+- Spark MLlib KMeans（ADS 层 RFM 聚类）
+- Java 17、Python 3.11（PySpark 3.5.1 官方支持范围）
 
 ## 输出目录
 - `output/ods/` — ODS 层 Parquet
@@ -60,5 +60,5 @@
 - `output/ads/` — ADS 层 CSV + Parquet（4 表）
 
 ## 简历可用的两行描述
-> 基于 PySpark 构建电商交易数仓，按 ODS→DWD→DWS→ADS 四层分层建模，处理 39 万条交易数据，覆盖 37 国 4,346 用户；
+> 基于 PySpark 构建电商交易数仓，按 ODS→DWD→DWS→ADS 四层分层建模，处理 39.8 万条清洗后的交易数据，覆盖 37 国 4,346 用户；
 > 实现 ETL 全流程自动化，输出月度 GMV 趋势、TOP20 热销商品、65.51% 复购率及 RFM 用户分群（KMeans 4 簇）等核心业务指标。
